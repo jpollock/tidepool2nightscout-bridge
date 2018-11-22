@@ -1,0 +1,27 @@
+{
+  "name": "tidepool2nightscout-bridge",
+  "version": "0.0.1",
+  "description": "Integration between tidepool and nightscout",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jpollock/tidepool2nightscout-bridge.git"
+  },
+  "dependencies": {
+    "moment-timezone": "^0.5.17",
+    "request": "^2.87.0"
+  },
+  "keywords": [
+    "tidepool",
+    "nightscout"
+  ],
+  "author": "Jeremy Pollock <jpollock911@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jpollock/tidepool2nightscout-bridge/issues"
+  },
+  "homepage": "https://github.com/jpollock/tidepool2nightscout-bridge#readme"
+}
