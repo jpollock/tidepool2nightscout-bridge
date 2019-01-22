@@ -43,10 +43,10 @@ var Defaults = {
 , login: 'https://' + server + '/api/v2/users/sign_in'
 , accept: 'application/json'
 , 'content-type': 'application/json'
-, LatestFoods: 'https://' + server + '/data/'
-, LatestInsulins: 'https://' + server + '/data/'
+, TidePoolDataUri: 'https://' + server + '/data/'
 // ?sessionID=e59c836f-5aeb-4b95-afa2-39cf2769fede&minutes=1440&maxCount=1"
 , nightscout_upload: '/api/v1/treatments.json'
+, nightscout_upload_profile: '/api/v1/profile.json'
 , MIN_PASSPHRASE_LENGTH: 12
 };
 
@@ -91,7 +91,8 @@ function fetch_query (url, opts) {
   , limit: opts.maxCount || 1000
   };
   //url += '&lastUpdatedAt=' + opts.lastUpdatedAt  + '&' + qs.stringify(q);
-  url += '&startDate=2018-11-20T15:00:00.000Z'
+  url += '&startDate=2018-12-01T00:00:00.000Z'
+  //url += '&startDate=2018-12-28T00:00:00.000Z'
   console.log(url);
   return url;
 }
@@ -126,12 +127,18 @@ function do_everything (opts, then) {
     //var fetch_opts = Object.create(opts.fetch);
     fetch_opts.lastUpdatedAt = d_then.toISOString();
 
-    fetch(Defaults.LatestFoods + fetch_opts.userID + '?type=wizard', fetch_opts, function (err, res, foods) {
-      fetch(Defaults.LatestInsulins + fetch_opts.userID+ '?type=bolus', fetch_opts, function (err, res, insulins) {
-        arr['foods'] = foods;
-        arr['insulins'] = insulins;
-        console.log("Foods: " + foods.length + " Insulins:" + insulins.length);
-        then(err, arr);  
+    fetch(Defaults.TidePoolDataUri + fetch_opts.userID + '?type=wizard', fetch_opts, function (err, res, foods) {
+      fetch(Defaults.TidePoolDataUri + fetch_opts.userID+ '?type=bolus', fetch_opts, function (err, res, boluses) {
+        fetch(Defaults.TidePoolDataUri + fetch_opts.userID+ '?type=basal', fetch_opts, function (err, res, basals) {
+          fetch(Defaults.TidePoolDataUri + fetch_opts.userID+ '?type=pumpSettings', fetch_opts, function (err, res, profiles) {
+            arr['foods'] = foods;
+            arr['boluses'] = boluses;
+            arr['basals'] = basals;
+            arr['profiles'] = profiles;
+            console.log("Foods: " + foods.length + " Boluses:" + boluses.length  + " Basals:" + basals.length + " Profiles:" + profiles.length);
+            then(err, arr);
+          });    
+        });    
       });
     });
   });
@@ -146,7 +153,8 @@ function generate_nightscout_treatments(entries, then) {
       // Carb Correction  
       //console.log(entries['foods']);
   var foods = entries['foods']; //ugh
-  var insulins = entries['insulins'];
+  var insulins = entries['boluses'];
+  var basals = entries['basals'];
   
   var treatments = []
   
@@ -231,7 +239,7 @@ function generate_nightscout_treatments(entries, then) {
           return Math.abs(minutes) < 46;
 
       })
-      console.log(element);
+      //console.log(element);
       //if (result[0] == undefined) {
         var f_date = moment(element.time);
         treatment.eventType = 'Correction Bolus';
@@ -245,16 +253,80 @@ function generate_nightscout_treatments(entries, then) {
         //treatment.eventTime = f_date.toISOString( );
         treatments.push(treatment);
       //}
+    });    
+  }
 
-      
+  if (basals) {
+    basals.forEach(function(element) {
+      var treatment = {};
 
+      //console.log(element);
+      /*
+      var f_date = new Date(element.timestamp);
+      var f_s_date = new Date(f_date.getTime() - 45*60000);
+      var f_e_date = new Date(f_date.getTime() + 45*60000);
 
+      var now = moment(f_date); //todays date
+      var end = moment(f_s_date); // another date
+      var duration = moment.duration(now.diff(end));
+      var minutes = duration.asMinutes();
+
+      var i_date = new Date();
+      var result = foods.filter(function(el) {
+          i_date = new Date(el.timestamp);
+          var i_moment = moment(i_date);
+          var duration = moment.duration(now.diff(i_moment));
+          var minutes = duration.asMinutes();
+          return Math.abs(minutes) < 46;
+
+      })
+      */
+      //console.log(element.deliveryType);
+      if (element.deliveryType == 'temp') {
+        var f_date = moment(element.time);
+        treatment.eventType = 'Temp Basal';
+        treatment.eventTime = element.time;// new Date(f_date + 420*60000).toISOString( );
+        treatment.absolute = element.rate;
+        treatment.duration = element.duration / 60000;
+        
+
+        //treatment.eventTime = f_date.toISOString( );
+        treatments.push(treatment);
+      }
     });    
   }
 
   then(err, treatments);
 }
 
+
+function generate_nightscout_profiles(entries, then) {
+  var t_profiles = entries['profiles'];
+
+  t_profiles.forEach(function(profile) {
+    //console.log(profile);
+  });
+
+  var profiles = []
+  
+
+
+  if (t_profiles) {
+    var element = t_profiles[0];
+    console.log(element);
+    var profile = {};
+    profile._id = "5ad2860e95ab570013dc1048";
+    profile.defaultProfile = "Default";
+    profile.store = {}
+      
+    profiles.push(profile);
+  }
+
+
+  [{"_id":"5ad2860e95ab570013dc1048","defaultProfile":"Default","store":{"Default":{"dia":"5","carbratio":[{"time":"00:00","value":"10","timeAsSeconds":"0"},{"time":"09:00","value":"14","timeAsSeconds":"32400"},{"time":"17:00","value":"15","timeAsSeconds":"61200"}],"carbs_hr":"20","delay":"20","sens":[{"time":"00:00","value":"250","timeAsSeconds":"0"},{"time":"09:00","value":"200","timeAsSeconds":"32400"},{"time":"20:00","value":"180","timeAsSeconds":"72000"},{"time":"23:00","value":"220","timeAsSeconds":"82800"}],"timezone":"US/Pacific","basal":[{"time":"00:00","value":"0.05","timeAsSeconds":"0"},{"time":"01:30","value":"0.1","timeAsSeconds":"5400"},{"time":"05:30","value":"0.05","timeAsSeconds":"19800"},{"time":"07:00","value":"0.15","timeAsSeconds":"25200"},{"time":"09:00","value":"0.05","timeAsSeconds":"32400"},{"time":"12:00","value":"0.2","timeAsSeconds":"43200"},{"time":"13:00","value":"0.1","timeAsSeconds":"46800"},{"time":"16:00","value":"0.15","timeAsSeconds":"57600"},{"time":"20:00","value":"0.45","timeAsSeconds":"72000"},{"time":"22:00","value":"0.1","timeAsSeconds":"79200"}],"target_low":[{"time":"00:00","value":"80","timeAsSeconds":"0"}],"target_high":[{"time":"00:00","value":"140","timeAsSeconds":"0"}],"startDate":"1970-01-01T00:00:00.000Z","units":"mg/dl"}},"startDate":"1970-01-01T00:00:00.000Z","mills":"0","units":"mg/dl","created_at":"2018-04-14T22:51:58.013Z"},{"_id":"5bf6c62e372d6f0012416a60","created_at":"2018-11-22T15:07:26.220Z"},{"_id":"5bf6c627372d6f0012416a5f","created_at":"2018-11-22T15:07:19.072Z"}]
+
+  then(err, profiles);
+}
 
 // Record data into Nightscout.
 function report_to_nightscout (opts, then) {
@@ -294,12 +366,17 @@ function engine (opts) {
       fetch_opts.lastUpdatedAt = then.toISOString();
 
       var arr = {};
-      fetch(Defaults.LatestFoods + fetch_opts.userID + '?type=wizard', fetch_opts, function (err, res, foods) {
-        fetch(Defaults.LatestInsulins + fetch_opts.userID + '?type=bolus', fetch_opts, function (err, res, insulins) {
-          arr['foods'] = foods;
-          arr['insulins'] = insulins;
-          
-          to_nightscout(arr);
+      fetch(Defaults.TidePoolDataUri + fetch_opts.userID + '?type=wizard', fetch_opts, function (err, res, foods) {
+        fetch(Defaults.TidePoolDataUri + fetch_opts.userID + '?type=bolus', fetch_opts, function (err, res, boluses) {
+          fetch(Defaults.TidePoolDataUri + fetch_opts.userID + '?type=basal', fetch_opts, function (err, res, basals) {
+            fetch(Defaults.TidePoolDataUri + fetch_opts.userID + '?type=pumpSettings', fetch_opts, function (err, res, profiles) {
+              arr['foods'] = foods;
+              arr['boluses'] = boluses;
+              arr['basals'] = basals;
+              arr['profiles'] = profiles;
+              to_nightscout(arr);
+            });
+          });
         });
       });
     } else {
@@ -437,14 +514,28 @@ if (!module.parent) {
             //console.log(ns_config);
             if (ns_config.endpoint) {
               ns_config.treatments = treatments;
-              console.log(treatments);
+              //console.log(treatments);
               // Send data to Nightscout.
-             report_to_nightscout(ns_config, function (err, response, body) {
+              report_to_nightscout(ns_config, function (err, response, body) {
                 console.log("Nightscout upload", 'error', err, 'status', response.statusCode, body);
 
               });
+              
             }
           });
+          generate_nightscout_profiles(entries, function(err, profiles) {
+            //var entries = glucose.map(dex_to_entry);
+            if (ns_config.endpoint) {
+              ns_config.profiles = profiles;
+              console.log(profiles);
+              // Send data to Nightscout.
+              /*report_to_nightscout(ns_config, function (err, response, body) {
+                console.log("Nightscout upload", 'error', err, 'status', response.statusCode, body);
+
+              });*/
+            }
+          });
+
         }
       });
       break;
